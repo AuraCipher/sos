@@ -174,6 +174,20 @@ npm run start                              # http://localhost:3000
   device with the link is lost, and remember ntfy.sh topic knowledge *is*
   the notification access control — pick an unguessable topic.
 
+## Logo & icons
+
+The app icon (the red SOS beacon, `public/logo-original.png`) is rendered
+into every web asset automatically by Next.js file conventions, all sitting
+in `src/app/`:
+
+- `favicon.ico` (16/32/48 classic), `icon.png` (256² modern),
+  `apple-icon.png` (180²), `opengraph-image.png` (1200×630 share card)
+- `public/logo.png` (128²) — the small badge in the site header and the
+  404 page (`src/components/page-shell.tsx`, `src/app/not-found.tsx`)
+
+Edit `public/logo-original.png`, run `bash scripts/make-brand-assets.sh`
+and rebuild — every asset regenerates from the single source picture.
+
 ## Deployment (Vercel)
 
 Not configured yet. When you deploy:

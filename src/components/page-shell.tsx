@@ -1,4 +1,5 @@
 import type { ReactNode } from "react";
+import Image from "next/image";
 
 /**
  * Shared page chrome: header, centered main content, footer. Used by the
@@ -9,9 +10,12 @@ export function PageShell({ children }: { children: ReactNode }) {
     <div className="flex min-h-dvh flex-col">
       <header className="border-b border-zinc-200 dark:border-zinc-800">
         <div className="mx-auto flex w-full max-w-3xl items-center gap-3 px-4 py-4 sm:px-6">
-          <span
-            aria-hidden="true"
-            className="h-2.5 w-2.5 shrink-0 rounded-full bg-red-600"
+          <Image
+            src="/logo.png"
+            alt=""
+            width={28}
+            height={28}
+            className="h-7 w-7 shrink-0 rounded-lg"
           />
           <div>
             <p className="text-sm font-bold tracking-tight text-zinc-900 dark:text-zinc-50">

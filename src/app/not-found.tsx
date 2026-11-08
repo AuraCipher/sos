@@ -1,7 +1,14 @@
+import Image from "next/image";
+
 export default function NotFound() {
   return (
     <div className="flex min-h-dvh flex-col items-center justify-center px-4 text-center">
-      <span aria-hidden="true" className="h-2.5 w-2.5 rounded-full bg-red-600" />
+      <Image
+        src="/logo.png"
+        alt=""
+        width={32}
+        height={32}
+        className="h-8 w-8 rounded-lg" />
       <h1 className="mt-6 text-4xl font-bold tracking-tight text-zinc-900 dark:text-zinc-50">
         Page not found
       </h1>

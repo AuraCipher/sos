@@ -4,7 +4,10 @@ import {
   createSessionCookieValue,
   SESSION_COOKIE_NAME,
 } from "@/lib/session";
-import { DEFAULT_SOS_MESSAGE } from "@/lib/sos";
+import {
+  DEFAULT_SOS_MESSAGE,
+  SOS_NOTIFICATION_TITLE,
+} from "@/lib/sos";
 
 const TEST_SESSION_SECRET = "test-session-secret-sos-route";
 const TEST_TOPIC = "test-topic-do-not-use";
@@ -68,7 +71,9 @@ describe("POST /api/sos", () => {
     expect(init.method).toBe("POST");
     const headers = init.headers as Record<string, string>;
     expect(headers.Priority).toBe("urgent");
-    expect(headers.Title).toBe("SOS Signal");
+    // Assert against the constant so wording edits in src/lib/sos.ts
+    // never break the suite.
+    expect(headers.Title).toBe(SOS_NOTIFICATION_TITLE);
     expect(headers.Authorization).toBeUndefined();
     expect(String(init.body)).toBe(DEFAULT_SOS_MESSAGE);
   });
