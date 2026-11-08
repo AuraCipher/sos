@@ -1,36 +1,74 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# SOS Pickup
 
-## Getting Started
+A tiny, private web app for two friends: one friend (who has no personal
+phone) can request a ride to or from college with a single tap — from a
+borrowed phone, a college computer, or any modern browser. The other friend
+receives the request as a push notification in the
+[ntfy](https://ntfy.sh) Android app he already uses.
 
-First, run the development server:
+## Technology stack
+
+- Next.js (App Router) + React + TypeScript
+- Tailwind CSS
+- Next.js Route Handlers (`/api/sos`) as the backend
+- ntfy.sh REST API for push delivery (planned — not wired up yet)
+- Vercel (deployment target — not configured yet)
+
+Deliberately no database, no separate server, no custom Android app, and no
+login system.
+
+## Getting started
+
+Requires Node.js 20.9+.
 
 ```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+npm install
+npm run dev        # http://localhost:3000
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Other commands:
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+```bash
+npm run lint       # ESLint CLI (Next.js 16 removed `next lint`)
+npm run build      # production build (Turbopack by default)
+npm run start      # serve the production build
+```
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+## Environment variables
 
-## Learn More
+`NTFY_TOPIC`, `NTFY_SERVER_URL`, `NTFY_AUTH_TOKEN`, and `NTFY_PRIORITY`
+(described in `.env.example`) will be read server-side by the SOS Route
+Handler once the ntfy integration is implemented. Real values belong in
+`.env.local` (git-ignored); never put them in `.env.example` or anywhere
+the browser can read.
 
-To learn more about Next.js, take a look at the following resources:
+## Current implementation status
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+Implemented:
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+- Responsive, mobile-first SOS interface (header, hero, red SEND SOS button,
+  optional message field, cooldown UI structure) with clear button states.
+- `src/app/api/sos/route.ts` — POST Route Handler that validates the JSON
+  body and currently answers an honest `501 Not Implemented`.
+- Shared constants + API contract in `src/lib/sos.ts`, including the fixed
+  default message: *"SOS: My Abu isn't coming today. Please pick me up!"*
 
-## Deploy on Vercel
+Not implemented yet:
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+- ntfy.sh publishing, the server-enforced 2-minute cooldown, and deployment.
+- Pressing SEND SOS today shows a "not connected yet" error; it never
+  pretends a pickup request was sent.
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+## Next steps: ntfy integration
+
+1. Pick a private, unguessable topic and subscribe the friend's ntfy Android
+   app to it (topic knowledge is the access control on ntfy.sh).
+2. Set `NTFY_TOPIC`, `NTFY_SERVER_URL`, `NTFY_AUTH_TOKEN` (if protected), and
+   `NTFY_PRIORITY` in `.env.local` and later in the Vercel project settings.
+3. In `src/app/api/sos/route.ts`:
+   - enforce the 2-minute cooldown, answering `429` with
+     `{ ok: false, error, retryAfterSeconds }`;
+   - publish to ntfy.sh (`PUT` with the fixed default message plus the
+     user's optional message and `Priority` header);
+   - return `{ ok: true, cooldownSeconds: 120 }` on success.
+4. Deploy to Vercel and test end-to-end from a borrowed phone.
