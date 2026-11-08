@@ -1,6 +1,12 @@
 "use client";
 
-import { useState, type FormEvent } from "react";
+import {
+  useEffect,
+  useRef,
+  useState,
+  type FormEvent,
+  type KeyboardEvent,
+} from "react";
 import { formatCountdown, useCountdown } from "@/lib/countdown";
 import {
   commitFailedPinAttempt,
@@ -13,6 +19,8 @@ import { SOS_PIN_ENDPOINT } from "@/lib/sos";
 type PinStatus = "idle" | "submitting" | "error";
 
 type PinApiResponse = { ok: true } | { ok: false; error?: string };
+
+const PIN_LENGTH = 6;
 
 const IDLE_STATUS_TEXT = "Enter your PIN to open the SOS panel.";
 const LOCKED_STATUS_TEXT =
@@ -30,7 +38,25 @@ const STATUS_TEXT_STYLES: Record<PinStatus, string> = {
 const LOCKED_TEXT_STYLE = "text-amber-700 dark:text-amber-400";
 
 /**
- * PIN entry screen (spec sections 3 + 4).
+ * PIN entry screen with a six-digit OTP-style interface (spec sections 3 + 4).
+ *
+ * Accessibility & interaction model:
+ * - ONE real <input> powers the field (a single logical value, a single
+ *   screen-reader node, and proper autocomplete="one-time-code" support);
+ *   the six digit boxes are purely visual and marked aria-hidden.
+ * - The input sits transparently on top of the boxes, so clicking anywhere
+ *   focuses it naturally. typing, caret movement, Backspace (deletes the
+ *   previous digit) and pasting a complete PIN all use native input
+ *   behavior; onChange strips anything that is not a digit and caps at six.
+ * - Only digits are accepted; inputMode="numeric" opens the numeric keypad.
+ * - The field auto-submits (via form.requestSubmit(), the exact same code
+ *   path as the UNLOCK button) once six digits are present. A just-tried
+ *   entry is not retried automatically: edit a digit or press UNLOCK to
+ *   retry it. The button also stays for partial entries.
+ * - NOTE: OTP styling is a typing convenience. It does NOT stop password
+ *   managers or browsers from remembering the PIN; the real protection is
+ *   the server-side check, the progressive browser lockout (below) and the
+ *   server-side throttle.
  *
  * The PIN is only ever sent over the wire to POST /api/auth/pin — it is
  * never stored by the browser. Failed attempts drive a progressive
@@ -40,9 +66,11 @@ const LOCKED_TEXT_STYLE = "text-amber-700 dark:text-amber-400";
  */
 export function PinGate({ onAuthenticated }: { onAuthenticated: () => void }) {
   const [pin, setPin] = useState("");
-  const [showPin, setShowPin] = useState(false);
   const [status, setStatus] = useState<PinStatus>("idle");
   const [statusMessage, setStatusMessage] = useState(IDLE_STATUS_TEXT);
+
+  const formRef = useRef<HTMLFormElement>(null);
+  const lastAutoSubmittedPinRef = useRef<string | null>(null);
 
   const lockEndsAt = usePinLockDeadline();
 
@@ -54,6 +82,25 @@ export function PinGate({ onAuthenticated }: { onAuthenticated: () => void }) {
 
   const locked = lockEndsAt !== null;
   const disabled = status === "submitting" || locked;
+
+  // Keep only numeric digits, at most six.
+  function handlePinChange(raw: string) {
+    setPin(raw.replace(/\D/g, "").slice(0, PIN_LENGTH));
+  }
+
+  // Auto-submit exactly like pressing UNLOCK, once the sixth digit lands.
+  useEffect(() => {
+    if (pin.length !== PIN_LENGTH || locked || status === "submitting") {
+      return;
+    }
+    // Do not loop on a value the server just rejected: it must change
+    // (or the user presses UNLOCK) before another automatic try.
+    if (lastAutoSubmittedPinRef.current === pin) {
+      return;
+    }
+    lastAutoSubmittedPinRef.current = pin;
+    formRef.current?.requestSubmit();
+  }, [pin, locked, status]);
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -121,6 +168,15 @@ export function PinGate({ onAuthenticated }: { onAuthenticated: () => void }) {
     }
   }
 
+  // Full entries, partials, everything: plain input editing semantics.
+  // (Backspace natively deletes the previous digit and shifts the caret.)
+  function handleKeyDown(event: KeyboardEvent<HTMLInputElement>) {
+    if (event.key === "Backspace" && pin.length === 0) {
+      // Nothing before the first digit — swallow to avoid form weirdness.
+      event.preventDefault();
+    }
+  }
+
   const buttonStyles = locked
     ? "cursor-not-allowed bg-zinc-200 text-zinc-600 dark:bg-zinc-800 dark:text-zinc-400"
     : status === "submitting"
@@ -132,6 +188,8 @@ export function PinGate({ onAuthenticated }: { onAuthenticated: () => void }) {
     : status === "submitting"
       ? "CHECKING…"
       : "UNLOCK";
+
+  const activeIndex = Math.min(pin.length, PIN_LENGTH - 1);
 
   return (
     <section
@@ -149,34 +207,60 @@ export function PinGate({ onAuthenticated }: { onAuthenticated: () => void }) {
       </p>
 
       <form
+        ref={formRef}
         onSubmit={handleSubmit}
         className="mt-10 flex w-full flex-col gap-4 sm:max-w-sm"
       >
-        <div className="relative">
+        <div
+          className={`relative rounded-2xl focus-within:ring-4 focus-within:ring-zinc-600/10 ${
+            disabled ? "opacity-60" : ""
+          }`}
+        >
           <label htmlFor="sos-pin" className="sr-only">
-            Your personal PIN
+            Your six-digit PIN
           </label>
+          <div
+            aria-hidden="true"
+            className="grid grid-cols-6 gap-2 sm:gap-3"
+          >
+            {Array.from({ length: PIN_LENGTH }, (_, index) => {
+              const digit = pin[index] ?? "";
+              const isActive = index === activeIndex;
+              return (
+                <div
+                  key={index}
+                  className={`flex h-14 w-full items-center justify-center rounded-2xl border bg-white text-2xl font-bold sm:text-3xl dark:bg-zinc-900 ${
+                    digit !== ""
+                      ? "border-zinc-600 text-zinc-900 dark:border-zinc-400 dark:text-zinc-100"
+                      : isActive
+                        ? "border-zinc-500 dark:border-zinc-500"
+                        : "border-zinc-300 dark:border-zinc-700"
+                  }`}
+                >
+                  {digit !== "" ? (
+                    digit
+                  ) : isActive && !disabled ? (
+                    <span className="h-7 w-0.5 rounded-full bg-zinc-500 sm:h-8 dark:bg-zinc-400" />
+                  ) : null}
+                </div>
+              );
+            })}
+          </div>
           <input
             id="sos-pin"
-            type={showPin ? "text" : "password"}
+            type="text"
             value={pin}
-            onChange={(event) => setPin(event.target.value)}
-            placeholder="Your PIN"
-            maxLength={64}
-            autoComplete="off"
+            onChange={(event) => handlePinChange(event.target.value)}
+            onKeyDown={handleKeyDown}
+            placeholder="000000"
+            maxLength={PIN_LENGTH}
+            inputMode="numeric"
+            autoComplete="one-time-code"
+            autoFocus
             disabled={disabled}
-            className="h-14 w-full rounded-2xl border border-zinc-300 bg-white pl-4 pr-20 text-lg text-zinc-900 outline-none focus:border-zinc-600 focus:ring-4 focus:ring-zinc-600/10 disabled:opacity-60 placeholder:text-zinc-400 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-100 dark:placeholder:text-zinc-500"
+            aria-describedby="pin-status"
+            className="absolute inset-0 h-full w-full cursor-text rounded-2xl text-2xl opacity-0 outline-none disabled:cursor-not-allowed"
           />
-          <button
-            type="button"
-            onClick={() => setShowPin((value) => !value)}
-            aria-pressed={showPin}
-            aria-label={showPin ? "Hide PIN" : "Show PIN"}
-            disabled={disabled}
-            className="absolute right-2 top-1/2 -translate-y-1/2 rounded-lg px-2 py-1 text-xs font-semibold text-zinc-500 hover:text-zinc-800 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-zinc-600/20 disabled:opacity-60 dark:text-zinc-400 dark:hover:text-zinc-200"
-          >
-            {showPin ? "Hide" : "Show"}
-          </button>
         </div>
 
         <button
@@ -188,6 +272,7 @@ export function PinGate({ onAuthenticated }: { onAuthenticated: () => void }) {
         </button>
 
         <p
+          id="pin-status"
           role="status"
           aria-live="polite"
           className={`min-h-6 text-center text-sm leading-6 ${
