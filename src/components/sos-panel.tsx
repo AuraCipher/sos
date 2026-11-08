@@ -1,68 +1,58 @@
 "use client";
 
-import { useEffect, useState, type FormEvent } from "react";
+import { useState, type FormEvent } from "react";
+import { formatCountdown, useCountdown } from "@/lib/countdown";
+import {
+  clearSosCooldown,
+  extendSosCooldown,
+  useSosCooldown,
+} from "@/lib/cooldown-browser";
 import {
   MAX_MESSAGE_LENGTH,
   SOS_API_ENDPOINT,
-  SOS_COOLDOWN_SECONDS,
   type SosResponse,
 } from "@/lib/sos";
 
-type Phase = "idle" | "sending" | "cooldown" | "error";
+type Phase = "idle" | "sending" | "error";
 
 const IDLE_STATUS_TEXT = "No message needed — one press sends the SOS.";
 const NETWORK_ERROR_TEXT =
   "Cannot reach the SOS service. Check the connection and try again.";
 const GENERIC_ERROR_TEXT = "Something went wrong. Please try again.";
+const COOLDOWN_RUNNING_TEXT =
+  "Request sent. Wait out the 30-second cooldown before sending another.";
 
 const STATUS_TEXT_STYLES: Record<Phase, string> = {
   idle: "text-zinc-500 dark:text-zinc-400",
   sending: "text-zinc-600 dark:text-zinc-300",
-  cooldown: "text-emerald-700 dark:text-emerald-400",
   error: "text-red-700 dark:text-red-400",
 };
 
-function formatCountdown(totalSeconds: number): string {
-  const minutes = Math.floor(totalSeconds / 60);
-  const seconds = totalSeconds % 60;
-  return `${minutes}:${String(seconds).padStart(2, "0")}`;
-}
+const COOLDOWN_TEXT_STYLE = "text-emerald-700 dark:text-emerald-400";
 
+/**
+ * Authenticated SOS interface.
+ *
+ * Successfully published requests start a browser-side 30-second cooldown
+ * persisted through an external localStorage store (spec section 6): a
+ * refresh keeps the countdown and the button re-enables when it expires.
+ * The cooldown is a convenience restriction, not a security control.
+ */
 export function SosPanel() {
   const [message, setMessage] = useState("");
   const [phase, setPhase] = useState<Phase>("idle");
   const [statusMessage, setStatusMessage] = useState(IDLE_STATUS_TEXT);
-  const [cooldownEndsAt, setCooldownEndsAt] = useState<number | null>(null);
-  const [remaining, setRemaining] = useState(0);
 
-  const busy = phase === "sending" || phase === "cooldown";
+  const cooldownEndsAt = useSosCooldown();
 
-  // Cooldown countdown: ticks until the user may send another SOS.
-  useEffect(() => {
-    if (cooldownEndsAt === null) {
-      return;
-    }
+  const remaining = useCountdown(cooldownEndsAt, () => {
+    clearSosCooldown();
+    setPhase("idle");
+    setStatusMessage(IDLE_STATUS_TEXT);
+  });
 
-    const tick = () => {
-      const left = Math.max(0, Math.ceil((cooldownEndsAt - Date.now()) / 1000));
-      setRemaining(left);
-      if (left === 0) {
-        setCooldownEndsAt(null);
-        setPhase("idle");
-        setStatusMessage(IDLE_STATUS_TEXT);
-      }
-    };
-
-    tick();
-    const interval = setInterval(tick, 500);
-    return () => clearInterval(interval);
-  }, [cooldownEndsAt]);
-
-  function startCooldown(seconds: number, text: string) {
-    setCooldownEndsAt(Date.now() + seconds * 1000);
-    setPhase("cooldown");
-    setStatusMessage(text);
-  }
+  const cooling = cooldownEndsAt !== null;
+  const busy = phase === "sending" || cooling;
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -83,49 +73,35 @@ export function SosPanel() {
         | SosResponse
         | null;
 
-      // Successful send: the backend dictates the cooldown length.
+      // The server only answers ok after ntfy confirmed the publish.
       if (response.ok && data !== null && data.ok) {
-        startCooldown(
-          typeof data.cooldownSeconds === "number" && data.cooldownSeconds > 0
-            ? data.cooldownSeconds
-            : SOS_COOLDOWN_SECONDS,
-          "Request sent. Wait the full cooldown before sending another.",
-        );
-        return;
-      }
-
-      // Rate-limited: adopt the server's remaining wait time.
-      if (
-        response.status === 429 &&
-        data !== null &&
-        !data.ok &&
-        typeof data.retryAfterSeconds === "number"
-      ) {
-        startCooldown(data.retryAfterSeconds, data.error);
+        extendSosCooldown();
+        setPhase("idle");
+        setStatusMessage(COOLDOWN_RUNNING_TEXT);
         return;
       }
 
       setPhase("error");
-      setStatusMessage(data !== null && !data.ok ? data.error : GENERIC_ERROR_TEXT);
+      setStatusMessage(
+        data !== null && !data.ok ? data.error : GENERIC_ERROR_TEXT,
+      );
     } catch {
       setPhase("error");
       setStatusMessage(NETWORK_ERROR_TEXT);
     }
   }
 
-  const buttonStyles =
-    phase === "cooldown"
-      ? "cursor-not-allowed bg-zinc-200 text-zinc-600 dark:bg-zinc-800 dark:text-zinc-400"
-      : phase === "sending"
-        ? "cursor-wait bg-red-600 text-white opacity-80"
-        : "bg-red-600 text-white shadow-sm hover:bg-red-700 active:bg-red-800";
+  const buttonStyles = cooling
+    ? "cursor-not-allowed bg-zinc-200 text-zinc-600 dark:bg-zinc-800 dark:text-zinc-400"
+    : phase === "sending"
+      ? "cursor-wait bg-red-600 text-white opacity-80"
+      : "bg-red-600 text-white shadow-sm hover:bg-red-700 active:bg-red-800";
 
-  const buttonLabel =
-    phase === "cooldown"
-      ? `RESEND IN ${formatCountdown(remaining)}`
-      : phase === "sending"
-        ? "SENDING…"
-        : "SEND SOS";
+  const buttonLabel = cooling
+    ? `RESEND IN ${formatCountdown(remaining)}`
+    : phase === "sending"
+      ? "SENDING…"
+      : "SEND SOS";
 
   return (
     <section
@@ -165,7 +141,7 @@ export function SosPanel() {
             placeholder="Add a message (optional)..."
             rows={3}
             maxLength={MAX_MESSAGE_LENGTH}
-            disabled={busy}
+            disabled={phase === "sending"}
             className="w-full resize-none rounded-2xl border border-zinc-300 bg-white px-4 py-3 text-base text-zinc-900 outline-none focus:border-red-600 focus:ring-4 focus:ring-red-600/15 disabled:opacity-60 placeholder:text-zinc-400 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-100 dark:placeholder:text-zinc-500"
           />
         </div>
@@ -173,9 +149,11 @@ export function SosPanel() {
         <p
           role="status"
           aria-live="polite"
-          className={`min-h-6 text-center text-sm leading-6 ${STATUS_TEXT_STYLES[phase]}`}
+          className={`min-h-6 text-center text-sm leading-6 ${
+            cooling ? COOLDOWN_TEXT_STYLE : STATUS_TEXT_STYLES[phase]
+          }`}
         >
-          {statusMessage}
+          {cooling ? COOLDOWN_RUNNING_TEXT : statusMessage}
         </p>
       </form>
     </section>

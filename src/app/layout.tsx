@@ -15,6 +15,8 @@ const geistMono = Geist_Mono({
 export const metadata: Metadata = {
   title: "SOS Pickup",
   description: "A simple way to request a ride.",
+  // Private app for two people: keep every route out of search indexes.
+  robots: { index: false, follow: false },
 };
 
 export default function RootLayout({ children }: LayoutProps<"/">) {

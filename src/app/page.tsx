@@ -1,34 +1,25 @@
-import { SosPanel } from "@/components/sos-panel";
+import { PageShell } from "@/components/page-shell";
 
 export default function Home() {
   return (
-    <div className="flex min-h-dvh flex-col">
-      <header className="border-b border-zinc-200 dark:border-zinc-800">
-        <div className="mx-auto flex w-full max-w-3xl items-center gap-3 px-4 py-4 sm:px-6">
-          <span
-            aria-hidden="true"
-            className="h-2.5 w-2.5 shrink-0 rounded-full bg-red-600"
-          />
-          <div>
-            <p className="text-sm font-bold tracking-tight text-zinc-900 dark:text-zinc-50">
-              SOS Pickup
-            </p>
-            <p className="text-xs text-zinc-500 dark:text-zinc-400">
-              A simple way to request a ride.
-            </p>
-          </div>
-        </div>
-      </header>
-
-      <main className="mx-auto flex w-full max-w-3xl flex-1 flex-col items-center justify-center px-4 py-16 sm:px-6">
-        <SosPanel />
-      </main>
-
-      <footer className="pb-6">
-        <p className="text-center text-xs text-zinc-500 dark:text-zinc-400">
-          A private pickup-request page for two friends.
+    <PageShell>
+      <section
+        aria-labelledby="home-heading"
+        className="flex w-full flex-col items-center text-center"
+      >
+        <h1
+          id="home-heading"
+          className="text-4xl font-bold tracking-tight text-zinc-900 sm:text-5xl dark:text-zinc-50"
+        >
+          SOS Pickup
+        </h1>
+        <p className="mt-4 text-lg text-zinc-600 dark:text-zinc-400">
+          A simple way to request a ride.
         </p>
-      </footer>
-    </div>
+        <p className="mt-2 max-w-sm text-sm text-zinc-500 dark:text-zinc-400">
+          This page is private. Ask your friend for an access link.
+        </p>
+      </section>
+    </PageShell>
   );
 }
