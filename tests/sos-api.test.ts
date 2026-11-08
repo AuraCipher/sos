@@ -68,7 +68,7 @@ describe("POST /api/sos", () => {
     expect(init.method).toBe("POST");
     const headers = init.headers as Record<string, string>;
     expect(headers.Priority).toBe("urgent");
-    expect(headers.Title).toBe("SOS Pickup");
+    expect(headers.Title).toBe("SOS Signal");
     expect(headers.Authorization).toBeUndefined();
     expect(String(init.body)).toBe(DEFAULT_SOS_MESSAGE);
   });

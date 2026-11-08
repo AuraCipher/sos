@@ -13,7 +13,7 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "SOS Pickup",
+  title: "SOS Signal",
   description: "A simple way to request a ride.",
   // Private app for two people: keep every route out of search indexes.
   robots: { index: false, follow: false },

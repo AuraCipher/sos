@@ -15,7 +15,7 @@ export function PageShell({ children }: { children: ReactNode }) {
           />
           <div>
             <p className="text-sm font-bold tracking-tight text-zinc-900 dark:text-zinc-50">
-              SOS Pickup
+              SOS Signal
             </p>
             <p className="text-xs text-zinc-500 dark:text-zinc-400">
               A simple way to request a ride.

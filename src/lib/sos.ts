@@ -32,7 +32,7 @@ export const SOS_COOLDOWN_SECONDS = 30;
 export const SOS_COOLDOWN_STORAGE_KEY = "sos.cooldownUntil";
 
 /** Notification title shown atop the ntfy Android notification. */
-export const SOS_NOTIFICATION_TITLE = "SOS Pickup";
+export const SOS_NOTIFICATION_TITLE = "SOS Signal";
 
 export type SosSuccessResponse = {
   ok: true;

@@ -1,4 +1,4 @@
-# SOS Pickup
+# SOS Signal
 
 A tiny, private web app for two friends: one friend (who has no personal
 phone) can request a ride to or from college with a single tap — from a
@@ -113,7 +113,7 @@ npm run start                              # http://localhost:3000
   Wrong PIN → "Incorrect PIN." message, guess-by-guess lockout messages.
   Correct PIN → the SOS panel appears (no reload) and the session is set.
 - **SOS notification (against the mock):** press SEND SOS and watch the
-  mock-ntfy terminal print `Title: SOS Pickup`, `Priority: urgent`, the
+  mock-ntfy terminal print `Title: SOS Signal`, `Priority: urgent`, the
   fixed message, and your optional line if you typed one. For a real
   notification later, set `NTFY_SERVER_URL=https://ntfy.sh` (or delete the
   mock's values) and subscribe the Android app to your topic.
