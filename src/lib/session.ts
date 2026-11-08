@@ -3,28 +3,24 @@ import { createHmac, timingSafeEqual } from "node:crypto";
 /**
  * Stateless, cryptographically signed pin-authentication sessions.
  *
- * The session is a HMAC-SHA256 signature over a small JSON payload
- * ({ v: 1, exp }) carried in the cookie value. Verification recomputes
- * the signature with the server-side SOS_SESSION_SECRET and checks the
- * expiry. No database: the secret itself keeps the sessions forge-proof.
+ * The session is an HMAC-SHA256 signature over a tiny JSON payload
+ * ({ v: 1 }) carried in the cookie value. Verification recomputes the
+ * signature with the server-side SOS_SESSION_SECRET. No database: the
+ * secret itself keeps the sessions forge-proof.
  *
- * The cookie is deliberately a browser *session* cookie: no Max-Age or
- * Expires, so it disappears when the browser closes.
+ * The session lives exactly as long as the browser session: the cookie is
+ * a browser-session cookie (no Max-Age or Expires) and the signature
+ * itself carries NO internal expiry, so while the browser stays open the
+ * session stays valid. To revoke a session (e.g. a lost device), rotate
+ * SOS_SESSION_SECRET — that invalidates every issued session at once.
  */
 
 export const SESSION_COOKIE_NAME = "sos_session";
 
-/** How long the signature remains valid, in seconds (12 hours). */
-export const SESSION_TTL_SECONDS = 12 * 60 * 60;
-
 export function createSessionCookieValue(sessionSecret: string): string {
-  const payload = Buffer.from(
-    JSON.stringify({
-      v: 1,
-      exp: Math.floor(Date.now() / 1000) + SESSION_TTL_SECONDS,
-    }),
-    "utf8",
-  ).toString("base64url");
+  const payload = Buffer.from(JSON.stringify({ v: 1 }), "utf8").toString(
+    "base64url",
+  );
 
   const signature = createHmac("sha256", sessionSecret)
     .update(payload, "utf8")
@@ -61,10 +57,13 @@ export function verifySessionCookieValue(
   }
 
   try {
+    // Signature-valid payload must carry the current version marker. The
+    // payload deliberately holds no expiry (see file header): the browser
+    // session is the session's lifetime.
     const decoded = JSON.parse(
       Buffer.from(payload, "base64url").toString("utf8"),
-    ) as { exp?: unknown };
-    return typeof decoded.exp === "number" && decoded.exp > Date.now() / 1000;
+    ) as { v?: unknown };
+    return decoded.v === 1;
   } catch {
     return false;
   }

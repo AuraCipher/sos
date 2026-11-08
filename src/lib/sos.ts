@@ -15,7 +15,7 @@ export const SOS_API_ENDPOINT = "/api/sos";
 
 /** Fixed notification message, included in every SOS no matter what. */
 export const DEFAULT_SOS_MESSAGE =
-  "SOS: My Abu isn't coming today. Please pick me up!";
+  "SOS: I need your help. Please contact me as soon as possible.";
 
 /** Maximum length of the user's optional message (rejected beyond this). */
 export const MAX_MESSAGE_LENGTH = 280;

@@ -43,8 +43,10 @@ Friend's browser                     Your phone (ntfy Android app)
 - The PIN is compared server-side against `SOS_PIN` (constant-time
   digest-first comparison) and never leaves the request body.
 - A correct PIN sets a HttpOnly, SameSite=Strict (Secure in production)
-  browser-session cookie: an HMAC-SHA256 signature over `{v, exp}` with
-  `SOS_SESSION_SECRET`, valid 12 hours, no Max-Age (dies with the browser).
+  browser-session cookie: an HMAC-SHA256 signature over a version marker
+  (`{v: 1}`) with `SOS_SESSION_SECRET`, with no Max-Age *and no embedded
+  expiry* — the session lives exactly as long as the browser session.
+  Rotating `SOS_SESSION_SECRET` invalidates every issued session.
 - Every `POST /api/sos` re-verifies the session server-side. On success it
   publishes the fixed message
   *"SOS: My Abu isn't coming today. Please pick me up!"*
@@ -148,9 +150,12 @@ npm run start                              # http://localhost:3000
   small in-memory throttle on repeated PIN failures per IP
   (`src/lib/pin-throttle.ts`) — it does not survive instance restarts and
   is not shared between serverless instances.
-- **Session cookie:** signature-based, 12-hour TTL, browser-session
-  lifetime (no Max-Age). HttpOnly always, Secure in production. Anyone
-  with the cookie from the same browser session counts as the friend.
+- **Session cookie:** signature-based with no Max-Age and **no embedded
+  expiry** — the session lasts as long as that browser session stays
+  open (closing the browser drops the cookie). There is deliberately no
+  server countdown; revocation is `SOS_SESSION_SECRET` rotation. Anyone
+  holding the cookie from that browser counts as the friend; HttpOnly
+  always, Secure in production.
 - **The URL echo:** for any Next.js dynamic route the HTML payload repeats
   the URL you requested (route metadata). Someone only sees the secret in
   a response if they already requested that exact URL. The secret is

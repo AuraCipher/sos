@@ -3,7 +3,6 @@ import { describe, expect, it } from "vitest";
 import {
   createSessionCookieValue,
   SESSION_COOKIE_NAME,
-  SESSION_TTL_SECONDS,
   sessionSetCookie,
   verifySessionCookieValue,
 } from "@/lib/session";
@@ -41,12 +40,22 @@ describe("session tokens", () => {
     );
   });
 
-  it("rejects expired sessions", () => {
-    const expired = makeToken(
+  it("lasts for the whole browser session: legacy expiry fields are ignored", () => {
+    // Even a token carrying a long-past exp stays valid while the cookie
+    // (a browser-session cookie) survives — expiry is not part of the
+    // design; rotating the secret is the revocation mechanism.
+    const legacy = makeToken(
       { v: 1, exp: Math.floor(Date.now() / 1000) - 5 },
       SECRET,
     );
-    expect(verifySessionCookieValue(expired, SECRET)).toBe(false);
+    expect(verifySessionCookieValue(legacy, SECRET)).toBe(true);
+  });
+
+  it("rejects payloads without the current version marker", () => {
+    expect(verifySessionCookieValue(makeToken({ v: 2 }, SECRET), SECRET)).toBe(
+      false,
+    );
+    expect(verifySessionCookieValue(makeToken({}, SECRET), SECRET)).toBe(false);
   });
 
   it("rejects garbage, empty, and missing values", () => {
@@ -59,16 +68,13 @@ describe("session tokens", () => {
     ).toBe(false);
   });
 
-  it("embeds the documented session lifetime", () => {
-    expect(SESSION_TTL_SECONDS).toBe(12 * 60 * 60);
+  it("embeds no server-side expiry into the payload", () => {
     const token = createSessionCookieValue(SECRET);
     const payload = JSON.parse(
       Buffer.from(token.split(".")[0], "base64url").toString("utf8"),
-    ) as { exp: number };
-    expect(payload.exp).toBeGreaterThan(Date.now() / 1000);
-    expect(payload.exp).toBeLessThanOrEqual(
-      Date.now() / 1000 + SESSION_TTL_SECONDS,
-    );
+    ) as Record<string, unknown>;
+    expect(payload).toEqual({ v: 1 });
+    expect("exp" in payload).toBe(false);
   });
 });
 
